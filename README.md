@@ -5,7 +5,6 @@
 <!-- Add CI/CD badge here if you set one up, e.g., GitHub Actions -->
 <!-- [![CI Status](https://github.com/etetteh/synthetic_data_generator/actions/workflows/ci.yml/badge.svg)](https://github.com/etetteh/synthetic_data_generator/actions/workflows/ci.yml) -->
 
-
 ## Table of Contents
 
 1.  [Introduction](#introduction)
@@ -17,16 +16,16 @@
     *   [Configuration (API Key)](#configuration-api-key)
 5.  [Usage](#usage)
     *   [Basic Command Structure](#basic-command-structure)
-        *   [Input Source](#input-source)
-        *   [Data Format](#data-format)
-        *   [Generation Parameters](#generation-parameters)
-        *   [Model Parameters](#model-parameters)
-        *   [Output Parameters](#output-parameters)
-        *   [Advanced Parameters](#advanced-parameters)
-        *   [Examples](#examples)
+    *   [Input Source](#input-source)
+    *   [Data Format](#data-format)
+    *   [Generation Parameters](#generation-parameters)
+    *   [Model Parameters](#model-parameters)
+    *   [Output Parameters](#output-parameters)
+    *   [Advanced Parameters](#advanced-parameters)
+    *   [Examples](#examples)
 6.  [Custom Format Specification](#custom-format-specification)
 7.  [Document Loading](#document-loading)
-8.  [Testing](#8-testing)
+8.  [Testing](#testing)
 9.  [Contributing](#contributing)
 10. [Versioning](#versioning)
 11. [License](#license)
@@ -44,62 +43,45 @@ The application is designed with maintainability, testability, and scalability i
 *   **LLM Integration:** Utilizes Google Gemini models via LangChain for data generation.
 *   **Flexible Input:** Generate data from natural language queries or document contexts.
 *   **Multiple Formats:** Supports predefined formats (QA, pairs, triplets) and custom formats defined via JSON schema.
-*   **Customizable Generation:** Control model parameters like `temperature`, `top_p`, and `top_k`.
+*   **Customizable Generation:** Control model parameters like temperature, top_p, and top_k.
 *   **Query Refinement:** Optional LLM-based refinement of input queries for potentially better results.
 *   **Batch Processing:** Efficiently generates data in batches.
 *   **Duplicate Detection:** Ensures uniqueness of generated samples using hashing.
 *   **Robust Error Handling:** Custom exception hierarchy and retry logic for transient API/parsing errors.
 *   **Input Validation:** Checks command-line arguments and custom format definitions.
 *   **Comprehensive Logging:** Detailed logging with configurable levels.
-*   **Multiple Output Formats:** Save generated data as JSON Lines (`jsonl`), CSV (`csv`), and Parquet (`parquet`).
+*   **Multiple Output Formats:** Save generated data as JSON Lines (`.jsonl`), CSV (`.csv`), and Parquet (`.parquet`).
 *   **Incremental Saving:** Option to save data incrementally to JSONL for large datasets, reducing memory usage.
 *   **Modular Design:** Well-structured codebase promoting maintainability and testability.
 
 ## 3. Architecture Overview
 
-The project follows a layered and modular architecture to separate concerns and improve maintainability. The following is the project structure:
+The project follows a layered and modular architecture to separate concerns and improve maintainability.
 
 ```
 synthetic-data-generator/
-├── tests/
-│   ├── __init__.py
-│   ├── conftest.py         # Fixtures and common setup
-│   ├── test_config.py
-│   ├── test_formats_utils.py
-│   ├── test_formats_predefined.py
-│   ├── test_formats_custom.py
-│   ├── test_llm_generator.py
-│   ├── test_loading_document_loader.py
-│   ├── test_output_saver.py
-│   ├── test_utils_hashing.py
-│   └── test_main_pipeline.py # Tests for run_generation_pipeline
+├── tests/              # Unit and Integration Tests
+│   ├── conftest.py     # Shared fixtures and configuration
+│   └── ... (test files organized by module)
 ├── synthetic_data_generator/
 │   ├── __init__.py
-│   ├── config.py
-│   ├── exceptions.py
-│   ├── main.py
-│   ├── formats/
-│   │   ├── __init__.py
-│   │   ├── base.py
-│   │   ├── custom.py
-│   │   ├── predefined.py
-│   │   └── utils.py
-│   ├── llm/
-│   │   ├── __init__.py
-│   │   └── generator.py
-│   ├── loading/
-│   │   ├── __init__.py
-│   │   └── document_loader.py
-│   ├── output/
-│   │   ├── __init__.py
-│   │   └── saver.py
-│   └── utils/
-│       ├── __init__.py
-│       └── hashing.py
-├── .env 
+│   ├── main.py         # Entry point, argument parsing, orchestration (Presentation Layer)
+│   ├── config.py       # Constants, defaults, environment loading
+│   ├── exceptions.py   # Custom exception hierarchy
+│   ├── formats/        # Data format handling (Strategy Pattern)
+│   │   └── ...
+│   ├── llm/            # LLM interaction layer
+│   │   └── ...
+│   ├── loading/        # Document loading layer
+│   │   └── ...
+│   ├── output/         # Data saving layer
+│   │   └── ...
+│   └── utils/          # General utilities
+│       └── ...
+├── .env
 ├── .gitignore
-├── README.md                
-└── requirements.txt                  
+├── README.md
+└── requirements.txt
 ```
 
 *   **Presentation Layer (`main.py`):** Handles command-line interface, parses arguments, sets up logging, initializes core components (injecting dependencies), and orchestrates the generation and saving process.
@@ -122,7 +104,7 @@ Dependency Injection is used to provide the `SyntheticDataGenerator` with instan
 
 ### Installation
 
-1. Clone the repository:
+1.  Clone the repository:
     ```bash
     git clone https://github.com/etetteh/synthetic_data_generator.git
     cd synthetic_data_generator
@@ -134,12 +116,12 @@ Dependency Injection is used to provide the `SyntheticDataGenerator` with instan
     ```
 3.  Install the required dependencies:
     ```bash
-    pip install -r requirements.txt 
+    pip install -r requirements.txt
     ```
 4.  Install optional dependencies as needed:
-    * For Parquet output: `pip install pandas pyarrow`
-    * For `.env` file support: `pip install python-dotenv`
-    * For document loading: Install your `ADLoader` dependency (e.g., `pip install ADLoader`). The current code assumes `ADLoader` is available in your Python environment.
+    *   For Parquet output: `pip install pandas pyarrow`
+    *   For `.env` file support: `pip install python-dotenv`
+    *   For document loading: Install your `ADLoader` dependency (e.g., `pip install ADLoader`). The current code assumes `ADLoader` is available in your Python environment.
 
 ### Configuration (API Key)
 
@@ -154,7 +136,7 @@ Replace `'YOUR_API_KEY'` with your actual key.
 Alternatively, if you installed `python-dotenv`, you can create a file named `.env` in the project's root directory with the following content:
 ```dotenv
 GOOGLE_API_KEY='YOUR_API_KEY'
-``` 
+```
 The script will automatically load this file.
 
 **Important:** Do not commit your `.env` file to version control. Add `.env` to your `.gitignore`.
@@ -163,7 +145,7 @@ The script will automatically load this file.
 
 The script is run as a module from the project root directory:
 
-```bash 
+```bash
 python -m synthetic_data_generator.main [OPTIONS]
 ```
 
@@ -179,13 +161,13 @@ python -m synthetic_data_generator.main <INPUT_SOURCE_OPTION> <FORMAT_OPTION> [O
 
 ### Input Source
 
-Choose exactly one: 
+Choose exactly one:
 
-* `--query <TEXT>`: A natural language query to guide data generation.
-* `--documents <PATH>`: Path to a document file or directory to use as context. Requires the `ADLoader` dependency.
+*   `--query <TEXT>`: A natural language query to guide data generation.
+*   `--documents <PATH>`: Path to a document file or directory to use as context. Requires the `ADLoader` dependency.
 
 ### Data Format
- 
+
 Choose exactly one:
 
 *   `--format {pair-class, pair-score, pair, triplet, qa}`: Use a predefined logical format.
@@ -197,12 +179,12 @@ Choose exactly one:
 *   `--custom_format_file <PATH>`: Path to a JSON file defining a custom data format structure. See [Custom Format Specification](#custom-format-specification) for details.
 
 ### Generation Parameters
- 
-* `--samples <N>`: Target number of *unique* samples to generate. Defaults to 50.
-* `--no-refine`: Disable automatic query refinement using the LLM (only applicable with `--query`). By default, refinement is enabled.
+
+*   `--samples <N>`: Target number of *unique* samples to generate. Defaults to 50.
+*   `--no-refine`: Disable automatic query refinement using the LLM (only applicable with `--query`). By default, refinement is enabled.
 
 ### Model Parameters
- 
+
 *   `--model <NAME>`: Google Gemini model name (e.g., `gemini-2.0-flash`, `gemini-1.5-pro-latest`). Defaults to `gemini-2.0-flash`.
 *   `--temperature <T>`: Generation temperature (0.0-2.0). Defaults to 0.4.
 *   `--top_p <P>`: Nucleus sampling threshold (>0.0-1.0). Defaults to 0.95.
@@ -221,7 +203,7 @@ Choose exactly one:
 *   `--log_level {DEBUG, INFO, WARNING, ERROR, CRITICAL}`: Set console logging level. Defaults to `INFO`.
 
 ### Examples
- 
+
 **Generate 50 QA pairs about Python programming (default settings):**
 
 ```bash
@@ -229,7 +211,7 @@ python -m synthetic_data_generator.main \
     --query "Generate questions and answers about Python programming." \
     --format qa
 ```
-*(Output files: `synthetic_data_qa_from_query.jsonl`, `synthetic_data_qa_from_query.csv`, `synthetic_data_qa_from_query.parquet`)* 
+*(Output files: `synthetic_data_qa_from_query.jsonl`, `synthetic_data_qa_from_query.csv`, `synthetic_data_qa_from_query.parquet`)*
 
 **Generate 20 textual entailment pairs (`pair-class`) from a query:**
 
@@ -248,7 +230,7 @@ python -m synthetic_data_generator.main \
     --custom_format_file path/to/my_format.json \
     --samples 100
 ```
-*(See [Custom Format Specification](#custom-format-specification) for `my_format.json` structure)* 
+*(See [Custom Format Specification](#custom-format-specification) for `my_format.json` structure)*
 
 **Generate 50 QA pairs from documents in a directory:**
 
@@ -270,7 +252,7 @@ python -m synthetic_data_generator.main \
     --output_prefix output/simple_facts \
     --output_format jsonl csv
 ```
-*(Output files: `output/simple_facts_pair_from_query.jsonl`, `output/simple_facts_pair_from_query.csv`)* 
+*(Output files: `output/simple_facts_pair_from_query.jsonl`, `output/simple_facts_pair_from_query.csv`)*
 
 **Generate 5000 samples incrementally to JSONL, then save as Parquet:**
 
@@ -283,7 +265,7 @@ python -m synthetic_data_generator.main \
     --incremental_save \
     --output_format jsonl parquet
 ```
-*(`large_reviews_pair-score_from_query.jsonl` is written incrementally. After generation, this file is loaded to create `large_reviews_pair-score_from_query.parquet`)* 
+*(`large_reviews_pair-score_from_query.jsonl` is written incrementally. After generation, this file is loaded to create `large_reviews_pair-score_from_query.parquet`)*
 
 **Generate with DEBUG logging:**
 
@@ -297,10 +279,10 @@ python -m synthetic_data_generator.main \
 
 ## 6. Custom Format Specification
 
-A custom format is defined by a JSON file. The structure must be a JSON object with the following keys: 
+A custom format is defined by a JSON file. The structure must be a JSON object with the following keys:
 
-* `name` (string, optional): A user-friendly name for the format. Defaults to the filename without extension.
-* `description` (string, optional): A brief description of the format's purpose. Defaults to a generic description based on the name.
+*   `name` (string, optional): A user-friendly name for the format. Defaults to the filename without extension.
+*   `description` (string, optional): A brief description of the format's purpose. Defaults to a generic description based on the name.
 *   `fields` (object, required): A dictionary where keys are the desired field names in the output data, and values are objects defining each field.
 
 Each field definition object must contain:
@@ -350,7 +332,7 @@ Each field definition object must contain:
   }
 }
 ```
- 
+
 ## 7. Document Loading
 
 The `--documents` option requires an external dependency, `ADLoader` (AutoDocumentLoader), which is assumed to be available in your Python environment. This class is expected to take a path (file or directory) in its constructor and have a `load()` method that returns a list of objects, where each object has a `page_content` attribute containing the text to be used as context.
@@ -359,7 +341,7 @@ If `ADLoader` is not installed or fails to import, the `--documents` option will
 
 ## 8. Testing
 
-The project includes a test suite using `pytest`. 
+The project includes a comprehensive test suite using `pytest`.
 
 1.  Install testing dependencies (if not already included in your `requirements.txt`):
     ```bash
@@ -369,7 +351,8 @@ The project includes a test suite using `pytest`.
     ```bash
     pytest
     ```
-The tests are organized into `unit/` and `integration/` directories within the `tests/` folder. 
+
+Tests are organized within the `tests/` directory, with files like `test_module_name.py` corresponding to the modules being tested (e.g., `test_formats_utils.py` tests `synthetic_data_generator/formats/utils.py`). `conftest.py` is used for shared test fixtures and configuration, promoting reusability and reducing boilerplate in individual test files. This structure supports both unit tests (testing individual functions/classes in isolation, often with mocking) and integration tests (testing the interaction between multiple components, like `test_main_pipeline.py`).
 
 ## 9. Contributing
 
@@ -378,8 +361,8 @@ Contributions are welcome! Please follow these steps:
 1.  Fork the repository.
 2.  Create a new branch (`git checkout -b feature/your-feature-name`).
 3.  Make your changes.
-4.  Write tests for your changes.
-5.  Ensure tests pass (`pytest`).
+4.  Write tests for your changes in the appropriate `tests/` file.
+5.  Ensure all tests pass (`pytest`).
 6.  Ensure code style is consistent (consider using `black` and `isort`).
 7.  Commit your changes (`git commit -m 'Add your feature'`).
 8.  Push to your fork (`git push origin feature/your-feature-name`).
@@ -391,7 +374,7 @@ The project version is defined in `synthetic_data_generator/__init__.py`. You ca
 
 ```bash
 python -m synthetic_data_generator.main --version
-``` 
+```
 
 ## 11. License
 
@@ -403,12 +386,12 @@ If you have any questions or issues, please open an issue on the GitHub reposito
 
 ## 13. Acknowledgements
 
-* [Google Gemini](https://ai.google.dev/models/gemini) for the powerful language models.
-* [LangChain](https://www.langchain.com/) for the flexible framework for developing LLM applications.
-* [tqdm](https://github.com/tqdm/tqdm) for the beautiful progress bars.
-* [Pandas](https://pandas.pydata.org/) and [PyArrow](https://arrow.apache.org/docs/python/) for Parquet support.
-* [python-dotenv](https://github.com/theskumar/python-dotenv) for environment variable management.
-* [ADLoader](https://github.com/your-adloader-repo) (Placeholder) for document loading capabilities.
+*   [Google Gemini](https://ai.google.dev/models/gemini) for the powerful language models.
+*   [LangChain](https://www.langchain.com/) for the flexible framework for developing LLM applications.
+*   [tqdm](https://github.com/tqdm/tqdm) for the beautiful progress bars.
+*   [Pandas](https://pandas.pydata.org/) and [PyArrow](https://arrow.apache.org/docs/python/) for Parquet support.
+*   [python-dotenv](https://github.com/theskumar/python-dotenv) for environment variable management.
+*   [ADLoader](https://github.com/your-adloader-repo) (Placeholder) for document loading capabilities.
 
 ---
-© 2025 etetteh
+© 2024 etetteh
