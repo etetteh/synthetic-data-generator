@@ -1,0 +1,10 @@
+langchain-community 
+langchain-google-genai 
+dotenv 
+tqdm
+pandas 
+pyarrow
+pytest
+python-dotenv
+
+# ADLoader>=1.0.0 # Placeholder for your custom 
