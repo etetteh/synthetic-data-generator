@@ -60,28 +60,46 @@ The application is designed with maintainability, testability, and scalability i
 The project follows a layered and modular architecture to separate concerns and improve maintainability. The following is the project structure:
 
 ```
-synthetic_data_generator/
-├── __init__.py         # Package initialization, version, public API
-├── main.py             # Entry point, argument parsing, orchestration (Presentation Layer)
-├── config.py           # Constants, defaults, environment loading
-├── exceptions.py       # Custom exception hierarchy
-├── utils/              # General utilities
-│   └── hashing.py      # Stable hashing for duplicate detection
-├── formats/            # Data format handling (Strategy Pattern)
-│   ├── base.py         # Abstract base class (DataFormatHandler)
-│   ├── predefined.py   # Handler for predefined formats
-│   ├── custom.py       # Handler for custom formats
-│   └── utils.py        # Format-related utilities (e.g., custom format loading)
-├── llm/                # LLM interaction layer
-│   ├── client.py       # (Placeholder/Wrapper for LLM client if needed)
-│   └── generator.py    # Core generation logic, batching, retries, parsing, validation (Business Logic)
-├── loading/            # Document loading layer
-│   └── document_loader.py # Wrapper for external document loader
-├── output/             # Data saving layer
-│   └── saver.py        # Handles saving to different formats (JSONL, CSV, Parquet)
-├── tests/              # Unit and Integration Tests
-├── requirements.txt    # Project dependencies
-└── README.md           # Project documentation
+synthetic-data-generator/
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py         # Fixtures and common setup
+│   ├── test_config.py
+│   ├── test_formats_utils.py
+│   ├── test_formats_predefined.py
+│   ├── test_formats_custom.py
+│   ├── test_llm_generator.py
+│   ├── test_loading_document_loader.py
+│   ├── test_output_saver.py
+│   ├── test_utils_hashing.py
+│   └── test_main_pipeline.py # Tests for run_generation_pipeline
+├── synthetic_data_generator/
+│   ├── __init__.py
+│   ├── config.py
+│   ├── exceptions.py
+│   ├── main.py
+│   ├── formats/
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   ├── custom.py
+│   │   ├── predefined.py
+│   │   └── utils.py
+│   ├── llm/
+│   │   ├── __init__.py
+│   │   └── generator.py
+│   ├── loading/
+│   │   ├── __init__.py
+│   │   └── document_loader.py
+│   ├── output/
+│   │   ├── __init__.py
+│   │   └── saver.py
+│   └── utils/
+│       ├── __init__.py
+│       └── hashing.py
+├── .env 
+├── .gitignore
+├── README.md                
+└── requirements.txt                  
 ```
 
 *   **Presentation Layer (`main.py`):** Handles command-line interface, parses arguments, sets up logging, initializes core components (injecting dependencies), and orchestrates the generation and saving process.
