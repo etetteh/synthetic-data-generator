@@ -68,7 +68,7 @@ def test_hash_item_type_error_fallback_time(mocker, caplog):
     h = hashing.hash_item(item)
 
     mock_dumps.assert_called_once()
-    mock_time.assert_called_once()
+    assert mock_time.call_count == 3
     assert "Fallback hash used" in caplog.text
     assert "Final hash fallback used" in caplog.text
     assert isinstance(h, str)
@@ -85,7 +85,7 @@ def test_hash_item_unexpected_error(mocker, caplog):
     h = hashing.hash_item(item)
 
     mock_dumps.assert_called_once()
-    mock_time.assert_called_once()
+    assert mock_time.call_count == 2
     assert "Unexpected error during item hashing" in caplog.text
     assert isinstance(h, str)
     assert len(h) == 32

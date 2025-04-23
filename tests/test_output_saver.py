@@ -3,7 +3,8 @@ import pytest
 import json
 import csv
 import os
-from unittest.mock import patch, mock_open, MagicMock
+from unittest.mock import patch, mock_open, MagicMock, call, ANY
+import logging
 
 # Import the module to test
 from synthetic_data_generator.output import saver
@@ -16,6 +17,9 @@ SAMPLE_DATA = [
     {"col_a": 3, "col_b": "pytest", "col_c": 3.3},
 ]
 CSV_FIELDNAMES = ["col_a", "col_b", "col_c"]
+
+# Capture original json.dumps before any patches
+original_json_dumps = json.dumps
 
 # --- save_data tests ---
 
@@ -99,40 +103,26 @@ def test_save_data_csv_header_inference(mocker, caplog):
     inferred_fieldnames = list(SAMPLE_DATA[0].keys())
     mock_save_csv.assert_called_once_with(SAMPLE_DATA, f"{base}.csv", inferred_fieldnames)
 
+
 def test_save_data_csv_header_inference_fails(mocker, caplog):
-    """Test save_data skips CSV if headers cannot be inferred (empty data)."""
+    """Test save_data skips CSV and logs error if headers cannot be inferred."""
+    caplog.set_level(logging.ERROR) # Check for the error log
+    # Patch save_as_csv in the context of the saver module
     mock_save_csv = mocker.patch('synthetic_data_generator.output.saver.save_as_csv')
     mocker.patch('os.path.exists', return_value=True)
+    # Suppress the initial "No data" warning if testing the empty list case first
+    # mocker.patch('synthetic_data_generator.output.saver.logger.warning')
 
     base = "output/data"
-    # Pass empty data list
-    saver.save_data([], base, ["csv"], csv_fieldnames=None)
 
-    # save_data itself handles empty data first, so csv inference won't be reached
-    # Let's test the specific logic block by mocking the initial check
-    mocker.patch('synthetic_data_generator.output.saver.logger.warning') # Suppress initial warning
-    with patch('synthetic_data_generator.output.saver.save_as_csv') as mock_csv_direct:
-         saver.save_data([{}], base, ["csv"], csv_fieldnames=None) # Data with empty dict
-         # Still infers keys from empty dict
-         mock_csv_direct.assert_called_once_with([{}], f"{base}.csv", [])
+    # Test with data that leads to empty headers: [{}]
+    saver.save_data([{}], base, ["csv"], csv_fieldnames=None)
 
-    # Test the specific error case within save_data's header logic
-    with patch('synthetic_data_generator.output.saver.save_as_csv') as mock_csv_direct:
-        with patch('logging.Logger.error') as mock_log_error:
-            # Simulate data being present initially but becoming empty before header check?
-            # Or more directly test the logic block:
-            if 'csv' in ['csv'] and None is None: # Simulate conditions
-                if not SAMPLE_DATA: # Make data appear empty here
-                    saver.save_data(SAMPLE_DATA, base, ['csv'], None) # Call again? No, test logic directly
-                    # This is hard to test directly without refactoring save_data
-                    # Let's assume the check `list(data[0].keys()) if data else None` works
-                    # and test the outcome if `effective_csv_fieldnames` becomes None
-                    pass # Test case setup is complex
-
-    # A simpler test: ensure CSV is skipped if explicitly removed from formats
-    mock_save_csv.reset_mock()
-    saver.save_data(SAMPLE_DATA, base, ["jsonl"], csv_fieldnames=None)
+    # Assert that save_as_csv was NOT called because 'csv' was removed from formats
     mock_save_csv.assert_not_called()
+    # Assert that the specific error was logged
+    assert "Cannot determine CSV fieldnames (no data and handler provided none). Skipping CSV save." in caplog.text
+
 
 
 # --- save_as_jsonl tests ---
@@ -141,20 +131,27 @@ def test_save_as_jsonl_success(mocker):
     """Test successful saving to JSONL."""
     mock_file = mock_open()
     mocker.patch('builtins.open', mock_file)
-    mocker.patch('json.dumps', side_effect=lambda d, ensure_ascii: json.dumps(d)) # Simple mock
+    # Correct the mock for json.dumps to handle keyword arguments
+    # Use the captured original_json_dumps to maintain behavior but allow mocking
+    mock_dumps = mocker.patch('json.dumps', side_effect=lambda d, **kwargs: original_json_dumps(d, **kwargs))
 
     filename = "test.jsonl"
     saver.save_as_jsonl(SAMPLE_DATA, filename)
 
     mock_file.assert_called_once_with(filename, 'w', encoding='utf-8')
     handle = mock_file()
+
+    # Check that json.dumps was called correctly for each item
+    assert mock_dumps.call_count == len(SAMPLE_DATA)
+    mock_dumps.assert_called_with(SAMPLE_DATA[-1], ensure_ascii=False) # Check last call args
+
     # Check if write was called for each item + newline
-    assert handle.write.call_count == len(SAMPLE_DATA)
+    assert handle.write.call_count == len(SAMPLE_DATA) # This assertion should now pass
     first_call_args = handle.write.call_args_list[0].args[0]
     assert first_call_args.startswith('{')
     assert first_call_args.endswith('}\n')
-    assert '"col_a": 1' in first_call_args
-    assert '"col_b": "hello"' in first_call_args
+    # Use json.loads to check content reliably
+    assert json.loads(first_call_args.strip()) == SAMPLE_DATA[0]
 
 def test_save_as_jsonl_os_error(mocker, caplog):
     """Test handling OSError during file open/write."""
@@ -204,22 +201,31 @@ def test_save_as_csv_success(mocker):
     """Test successful saving to CSV."""
     mock_file = mock_open()
     mocker.patch('builtins.open', mock_file)
-    mock_dict_writer = MagicMock()
-    mock_csv_module = MagicMock()
-    mock_csv_module.DictWriter.return_value = mock_dict_writer
-    mocker.patch('synthetic_data_generator.output.saver.csv', mock_csv_module)
+    # More robust mocking for csv.DictWriter
+    mock_dict_writer_instance = MagicMock()
+    mock_dict_writer_class = MagicMock(return_value=mock_dict_writer_instance)
+    # Patch where csv is used inside the saver module
+    mocker.patch('synthetic_data_generator.output.saver.csv.DictWriter', mock_dict_writer_class)
+    # Also mock the constant if needed, though patching DictWriter is usually enough
+    mocker.patch('synthetic_data_generator.output.saver.csv.QUOTE_MINIMAL', csv.QUOTE_MINIMAL)
+
 
     filename = "test.csv"
     saver.save_as_csv(SAMPLE_DATA, filename, CSV_FIELDNAMES)
 
     mock_file.assert_called_once_with(filename, 'w', newline='', encoding='utf-8')
-    mock_csv_module.DictWriter.assert_called_once()
-    # Check fieldnames passed to DictWriter
-    assert mock_csv_module.DictWriter.call_args.kwargs['fieldnames'] == CSV_FIELDNAMES
-    mock_dict_writer.writeheader.assert_called_once()
-    mock_dict_writer.writerows.assert_called_once()
-    # Check data passed to writerows (ensure it's filtered)
-    passed_data = mock_dict_writer.writerows.call_args[0][0]
+    # Check that DictWriter was instantiated correctly
+    mock_dict_writer_class.assert_called_once_with(
+        ANY, # The file handle
+        fieldnames=CSV_FIELDNAMES,
+        quoting=csv.QUOTE_MINIMAL,
+        extrasaction='ignore'
+    )
+    # Check methods called on the instance
+    mock_dict_writer_instance.writeheader.assert_called_once()
+    mock_dict_writer_instance.writerows.assert_called_once()
+    # Check data passed to writerows (ensure it's filtered - already correct in original)
+    passed_data = mock_dict_writer_instance.writerows.call_args[0][0]
     assert passed_data == SAMPLE_DATA # In this case, all keys are in fieldnames
 
 def test_save_as_csv_filters_data(mocker):

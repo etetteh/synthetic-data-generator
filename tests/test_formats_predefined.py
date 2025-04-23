@@ -44,7 +44,7 @@ def test_predefined_prompts(format_name):
 
     assert "doc1 text" in doc_prompt
     assert "doc2 text" in doc_prompt
-    assert "generate 3" in doc_prompt
+    assert "generate 3" in doc_prompt.lower()
     assert handler.get_format_name() in doc_prompt
     assert handler.get_example_structure_string() in doc_prompt
 

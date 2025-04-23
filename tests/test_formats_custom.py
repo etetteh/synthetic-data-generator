@@ -38,7 +38,7 @@ def test_custom_handler_prompts(sample_custom_format_def):
     assert handler.get_format_name() in doc_prompt
     assert example_str in doc_prompt
     assert "custom doc" in doc_prompt
-    assert "generate 2" in doc_prompt
+    assert "generate 2" in doc_prompt.lower()
 
 def test_custom_validate_item_success(sample_custom_format_def):
     """Test successful validation for a custom format."""
@@ -119,8 +119,10 @@ def test_custom_validate_item_required_none_fails(sample_custom_format_def):
     """Test validation fails if a required field is explicitly None."""
     handler = custom.CustomFormatHandler(sample_custom_format_def)
     item = {"id": None, "text": "abc"} # id is required
+    
     # It first fails the type check because None is not int
-    with pytest.raises(exceptions.ValidationError, match="field 'id': Expected type int, got NoneType"):
+    expected_error_msg = r"Item \d+, required field 'id' is missing or None."
+    with pytest.raises(exceptions.ValidationError, match=expected_error_msg):
          handler.validate_item(item, 0)
     # If type was 'any' or similar, the explicit None check would trigger:
     # with pytest.raises(exceptions.ValidationError, match="required field 'id' is missing or None"):

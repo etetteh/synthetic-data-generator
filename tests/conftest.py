@@ -2,19 +2,23 @@
 import pytest
 import os
 from unittest.mock import MagicMock
+# Import the class for spec'ing the mock
+from synthetic_data_generator.config import ChatGoogleGenerativeAI
 
 # Mock LangChain classes if needed globally, or within specific tests
 # Example: Mock the LLM client
 @pytest.fixture
 def mock_llm_client():
     """Fixture for a mocked ChatGoogleGenerativeAI client."""
-    mock_client = MagicMock()
+    # Use spec=ChatGoogleGenerativeAI to make isinstance checks pass
+    mock_client = MagicMock(spec=ChatGoogleGenerativeAI)
     # Configure mock responses as needed for specific tests
     mock_response = MagicMock()
     mock_response.content = '[]' # Default empty JSON list response
     mock_response.response_metadata = {'finish_reason': 'STOP', 'block_reason': 'N/A'}
     mock_client.invoke.return_value = mock_response
     # Mock attributes accessed in the generator init
+    # These might not be strictly necessary with spec=, but good to keep if accessed
     mock_client.model = "mock-gemini-model"
     mock_client.temperature = 0.5
     mock_client.top_p = 0.9

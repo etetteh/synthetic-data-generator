@@ -1,6 +1,7 @@
 # tests/test_formats_utils.py
 import pytest
 import json
+import logging
 from synthetic_data_generator.formats import utils
 from synthetic_data_generator import exceptions
 from synthetic_data_generator import config # For TYPE_MAP

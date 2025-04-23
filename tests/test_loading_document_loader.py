@@ -41,8 +41,9 @@ def test_load_document_texts_success(mock_ad_loader, mock_os_path):
     mock_loader_instance.load.assert_called_once()
     assert texts == ["Content of doc 1.", "Content of doc 2."] # Check stripping
 
-def test_load_document_texts_path_not_found(mock_os_path):
+def test_load_document_texts_path_not_found(mock_os_path, mock_ad_loader):
     """Test error when document path does not exist."""
+    # mock_ad_loader fixture ensures DOCUMENT_LOADING_ENABLED is True
     mock_os_path.return_value = False # Path does not exist
 
     with pytest.raises(exceptions.ConfigurationError, match="Document path not found"):
