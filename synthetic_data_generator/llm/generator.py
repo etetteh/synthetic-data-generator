@@ -16,11 +16,18 @@ from .. import exceptions
 from .. import config
 from ..utils import hashing # Import hashing utility
 from ..formats.base import DataFormatHandler # Import abstract base class
+from ..loading import document_loader as doc_loader
+
 from langchain_core.messages import SystemMessage, HumanMessage # Re-export or import specific LangChain types
 from langchain_core.exceptions import OutputParserException # Re-export or import specific LangChain exceptions
 from langchain_google_genai import ChatGoogleGenerativeAI # Import the concrete class for type hinting
 
 logger = logging.getLogger(__name__)
+
+
+class _EmptyContentError(exceptions.GenerationError):
+    """Internal exception to signal empty content for retry purposes."""
+    pass
 
 class SyntheticDataGenerator:
     """
@@ -143,6 +150,9 @@ class SyntheticDataGenerator:
 
             logger.info(f"Refined query: '{refined_query}'")
             return refined_query
+        except exceptions.GenerationError as e:
+            logger.error(f"Critical error during query refinement: {e}", exc_info=False) # Log without full trace
+            raise
         except Exception as e:
             # Log refinement errors but proceed with original query
             logger.error(f"Non-critical error during query refinement: {e}", exc_info=True)
@@ -154,7 +164,8 @@ class SyntheticDataGenerator:
         Invokes the configured LLM with robust retry logic.
 
         Handles transient errors (like timeouts or rate limits, depending on API)
-        using exponential backoff.
+        using exponential backoff. Also retries on empty content responses unless
+        blocked by safety settings.
 
         Args:
             messages: A list of SystemMessage and HumanMessage objects for the LLM call.
@@ -166,7 +177,7 @@ class SyntheticDataGenerator:
 
         Raises:
             exceptions.GenerationError: If the LLM call fails permanently after all retries,
-                             or if the LLM returns empty content unexpectedly.
+                             or if blocked by safety settings.
         """
         retries = 0
         last_exception = None
@@ -176,53 +187,61 @@ class SyntheticDataGenerator:
                 response = self.model.invoke(messages)
 
                 # --- Check for Empty or Blocked Response ---
-                # Check if content is missing or empty string
                 if not response or not hasattr(response, 'content') or not response.content or response.content.strip() == "":
-                    # Try to get more details from metadata if available
                     block_reason = "N/A"
                     finish_reason = "N/A"
                     if hasattr(response, 'response_metadata'):
                         block_reason = response.response_metadata.get('block_reason', 'N/A')
                         finish_reason = response.response_metadata.get('finish_reason', 'N/A')
-                        # If specifically blocked by safety filters, maybe don't retry?
                         if finish_reason == 'SAFETY':
+                             safety_error_msg = f"LLM call blocked by safety settings (Reason: {block_reason})"
                              logger.error(f"LLM call for {purpose} blocked due to safety settings (Block Reason: {block_reason}). Cannot retry this prompt.")
-                             raise exceptions.GenerationError(f"LLM call blocked by safety settings (Reason: {block_reason})")
+                             # Raise specific error for safety block - this will exit the loop
+                             raise exceptions.GenerationError(safety_error_msg)
 
+                    # If not a safety block, treat as empty content
+                    empty_error_msg = f"LLM returned empty content (Finish: {finish_reason}, Block: {block_reason})"
                     logger.warning(f"LLM returned empty content for {purpose} (Attempt {retries+1}). Finish Reason: {finish_reason}, Block Reason: {block_reason}.")
-                    # Raise error to trigger retry for potentially transient empty responses
-                    raise exceptions.GenerationError(f"LLM returned empty content (Finish: {finish_reason}, Block: {block_reason})")
+                    # Raise a standard Exception to trigger the general retry logic below
+                    raise Exception(empty_error_msg) # Use standard Exception for retry
 
                 # --- Success ---
                 return response
 
             # --- Error Handling & Retry Logic ---
+            except exceptions.GenerationError as ge:
+                 # Catch GenerationErrors specifically (currently only safety blocks raise this directly)
+                 last_exception = ge
+                 logger.error(f"LLM invocation failed for {purpose} (Attempt {retries + 1}/{self.max_retries + 1}): {type(ge).__name__}: {ge} - Not retrying.")
+                 break # Exit loop immediately for safety blocks
+
             except Exception as e:
+                 # Catch other exceptions (including the standard Exception raised for empty content)
                  last_exception = e
                  log_msg = f"LLM invocation failed for {purpose} (Attempt {retries + 1}/{self.max_retries + 1}): {type(e).__name__}: {e}"
 
-                 # TODO: Implement more specific checks for retryable API errors if possible
-                 # Example: Check for specific Google API error codes or HTTP status codes if accessible
-                 # is_retryable = isinstance(e, (google_api_exceptions.InternalServerError, ...))
-                 is_retryable = True # Defaulting to retry most exceptions for simplicity
+                 # Check if retry limit reached
+                 if retries >= self.max_retries:
+                     logger.error(log_msg + " - Max retries reached.")
+                     break # Exit loop if max retries hit
 
-                 if is_retryable and retries < self.max_retries:
-                    logger.warning(log_msg)
-                    retries += 1
-                    # Calculate sleep time using exponential backoff + jitter
-                    sleep_time = (self.retry_delay * (2 ** (retries - 1))) + (random.uniform(0, 0.5))
-                    logger.info(f"Waiting {sleep_time:.2f} seconds before retrying LLM call...")
-                    time.sleep(sleep_time)
-                 else: # Non-retryable error or max retries reached
-                     logger.error(f"LLM invocation failed permanently for {purpose} after {retries + 1} attempts. Last error: {e}")
-                     # Raise the final error, preserving the original exception context
-                     raise exceptions.GenerationError(f"LLM call failed after multiple retries for {purpose}") from last_exception
+                 # Otherwise, assume retryable
+                 logger.warning(log_msg + " - Retrying...")
+                 retries += 1
+                 sleep_time = (self.retry_delay * (2 ** (retries - 1))) + (random.uniform(0, 0.5))
+                 logger.info(f"Waiting {sleep_time:.2f} seconds before retrying LLM call...")
+                 time.sleep(sleep_time)
+                 # Loop continues
 
-        # This line should theoretically be unreachable if max_retries >= 0
-        # Added a final check just in case, though the loop logic should prevent it
+        # --- Final Error Raising ---
+        # This is reached if the loop finished (by break or exhausting retries) without returning
         if last_exception:
-             raise exceptions.GenerationError(f"LLM call failed after multiple retries for {purpose}") from last_exception
-        else:
+             # If the loop broke due to a non-retryable GenerationError (safety block)
+             if isinstance(last_exception, exceptions.GenerationError):
+                 raise last_exception
+             else: # Otherwise (max retries reached for empty content or other Exception)
+                 raise exceptions.GenerationError(f"LLM call failed after multiple retries for {purpose}") from last_exception
+        else: # Should be unreachable
              raise exceptions.GenerationError(f"Exited LLM retry loop unexpectedly for {purpose}.")
 
 
@@ -311,7 +330,7 @@ class SyntheticDataGenerator:
             raise exceptions.GenerationError("Unexpected parsing/validation error") from e
 
 
-    def _generate_one_batch_with_retry(self, human_prompt: str) -> List[Dict]:
+    def _generate_one_batch_with_retry(self, human_prompt: str, item_index_offset: int = 0) -> List[Dict]:
         """
         Generates a single batch of data, handling retries for LLM calls, parsing, and validation.
 
@@ -354,7 +373,7 @@ class SyntheticDataGenerator:
 
                 # Step 2: Parse and Validate Response
                 # This step can raise OutputParserError or ValidationError
-                batch_results = self._parse_and_validate_llm_response(response_text)
+                batch_results = self._parse_and_validate_llm_response(response_text, item_index_offset=item_index_offset)
 
                 # If parsing and validation succeeded (even if list is empty), batch is considered successful
                 batch_success = True
@@ -495,8 +514,9 @@ class SyntheticDataGenerator:
 
 
                 # --- Generate Batch (with internal retries for LLM/parsing) ---
-                batch_results = self._generate_one_batch_with_retry(human_prompt)
-
+                current_offset = generated_count # Offset is the count *before* this batch
+                batch_results = self._generate_one_batch_with_retry(human_prompt, item_index_offset=current_offset)
+                
                 # --- Handle Batch Outcome ---
                 if not batch_results:
                     # Batch failed permanently or returned zero valid items after retries
