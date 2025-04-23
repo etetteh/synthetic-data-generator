@@ -17,7 +17,7 @@ try:
     # Note: In a real project, ADLoader would likely be installed via pip
     # and imported like `from my_document_loader import AutoDocumentLoader`
     # For this example, we keep the try/except pattern.
-    from ADLoader import AutoDocumentLoader
+    from .ADLoader import AutoDocumentLoader
     DOCUMENT_LOADING_ENABLED = True
 except ImportError:
     DOCUMENT_LOADING_ENABLED = False
