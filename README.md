@@ -394,4 +394,4 @@ If you have any questions or issues, please open an issue on the GitHub reposito
 *   [ADLoader](https://github.com/your-adloader-repo) (Placeholder) for document loading capabilities.
 
 ---
-© 2024 etetteh
+© 2024 Enoch Tetteh 
