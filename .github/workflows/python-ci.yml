@@ -1,0 +1,51 @@
+# .github/workflows/python-ci.yml
+
+name: Python CI/CD
+
+on:
+  push:
+    branches: [ "main", "master" ] # Adjust branch names if needed
+  pull_request:
+    branches: [ "main", "master" ] # Adjust branch names if needed
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"] # Test against multiple Python versions
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        # Assuming you have a requirements.txt file
+        # If you use Poetry or another manager, adjust this step
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+        # Install testing dependencies if they are separate
+        if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+        # Or install pytest and plugins directly if not in requirements
+        pip install pytest pytest-mock pytest-cov anyio pluggy langsmith
+
+    - name: Run tests with pytest
+      run: |
+        # The -v flag gives verbose output, -s shows print statements (useful for debugging CI failures)
+        # --cov generates a coverage report
+        pytest -v -s --cov=synthetic_data_generator --cov-report=xml
+
+    # Optional: Upload coverage report to Codecov or similar services
+    # - name: Upload coverage reports to Codecov
+    #   uses: codecov/codecov-action@v4
+    #   with:
+    #     token: ${{ secrets.CODECOV_TOKEN }} # Add CODECOV_TOKEN to your repository secrets
+    #     files: ./coverage.xml
+    #     fail_ci_if_error: true
